@@ -1,9 +1,12 @@
+import json
+import logging
 import os
 from typing import Dict, Optional, Union
 
 import requests
 
 from qwen_agent.tools.base import BaseTool, register_tool
+import jionlp as jio
 
 
 @register_tool('amap_weather')
@@ -12,7 +15,7 @@ class AmapWeather(BaseTool):
     parameters = [{
         'name': 'location',
         'type': 'string',
-        'description': '城市/区具体名称，如`北京市海淀区`请描述为`海淀区`',
+        'description': '城市/区具体名称，如`北京市海淀区`请描述为`北京市海淀区`',
         'required': True
     }]
 
@@ -22,13 +25,14 @@ class AmapWeather(BaseTool):
         # remote call
         self.url = 'https://restapi.amap.com/v3/weather/weatherInfo?city={city}&key={key}'
 
-        import pandas as pd
-        self.city_df = pd.read_excel(
-            'https://modelscope.oss-cn-beijing.aliyuncs.com/resource/agent/AMap_adcode_citycode.xlsx')
+        # self.city_df = pd.read_excel(
+        #     'https://modelscope.oss-cn-beijing.aliyuncs.com/resource/agent/AMap_adcode_citycode.xlsx')
+
+        self.code_map = json.load(open('./assets/code_map.json'))
 
         self.token = self.cfg.get('token', os.environ.get('AMAP_TOKEN', ''))
         assert self.token != '', 'weather api token must be acquired through ' \
-            'https://lbs.amap.com/api/webservice/guide/create-project/get-key and set by AMAP_TOKEN'
+                                 'https://lbs.amap.com/api/webservice/guide/create-project/get-key and set by AMAP_TOKEN'
 
     def get_city_adcode(self, city_name):
         filtered_df = self.city_df[self.city_df['中文名'] == city_name]
@@ -39,13 +43,25 @@ class AmapWeather(BaseTool):
 
     def call(self, params: Union[str, dict], **kwargs) -> str:
         params = self._verify_json_format_args(params)
-
         location = params['location']
-        response = requests.get(self.url.format(city=self.get_city_adcode(location), key=self.token))
+        address_info = []
+        address_parse = jio.parse_location(location)
+        if address_parse['province']:
+            address_info.append(address_parse['province'])
+        if address_parse['city'] and address_parse['city'] not in ['北京市', '天津市',
+                                                                   '重庆市', '上海市']:
+            address_info.append(address_parse['city'])
+
+        if address_parse['county']:
+            address_info.append(address_parse['county'])
+
+        code = self.code_map.get('_'.join(address_info), '')
+
+        response = requests.get(self.url.format(city=code, key=self.token))
         data = response.json()
         if data['status'] == '0':
             raise RuntimeError(data)
         else:
             weather = data['lives'][0]['weather']
             temperature = data['lives'][0]['temperature']
-            return f'{location}的天气是{weather}温度是{temperature}度。'
+            return f'{location}的天气是{weather}，温度是{temperature}度。'
