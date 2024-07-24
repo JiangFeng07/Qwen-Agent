@@ -10,6 +10,7 @@ from .retrieval import Retrieval
 from .simple_doc_parser import SimpleDocParser
 from .storage import Storage
 from .web_extractor import WebExtractor
+from .retrieval_answer import RetrievalAnswer
 
 __all__ = [
     'BaseTool',
@@ -27,4 +28,5 @@ __all__ = [
     'HybridSearch',
     'FrontPageSearch',
     'ExtractDocVocabulary',
+    'RetrievalAnswer'
 ]

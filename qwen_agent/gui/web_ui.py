@@ -219,6 +219,7 @@ class WebUI:
         _chatbot[-1][1] = [None for _ in range(len(self.agent_list))]
 
         agent_runner = self.agent_list[_agent_selector or 0]
+        logger.info(f'agent_runner: {agent_runner.name}')
         if self.agent_hub:
             agent_runner = self.agent_hub
         responses = []
